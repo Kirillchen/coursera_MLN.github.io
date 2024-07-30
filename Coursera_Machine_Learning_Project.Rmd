@@ -1,0 +1,88 @@
+---
+title: "Coursera: Machine Learning Project"
+author: "Tsatkhlanov Kirill"
+date: "2024-07-28"
+output: html_document
+---
+
+## Loading Vital Packages and Data
+
+```{r , echo = TRUE, message = FALSE}
+
+library(dplyr)
+library(data.table)
+library(caret)
+
+set.seed(123)
+
+data <- rio::import("./pml_training.csv") %>% as_tibble()
+validation <- rio::import("./pml_testing.csv") %>% as_tibble()
+
+```
+
+## Adjusting Data
+
+Prior building any Machine Learning model, it is vital to pick necessary risk drivers and impute missing values. In our case we have several columns that nearly 90% consist of missing values. In this case the "knnImpuation" function will not work and other imputation mechanisms would damage the representativeness of the data, as the missing quota is too high. In the code below I remove all deficiencies and complete the same procedure for the validation data set.
+
+```{r echo = TRUE}
+
+data_cleaned <- data %>% 
+  select_if(~ !any(is.na(.))) %>% 
+  select(-ends_with("x"), -ends_with("y"), -ends_with("z"),
+         -c("V1", "user_name", "raw_timestamp_part_1", "raw_timestamp_part_2", "cvtd_timestamp"),
+         -c("new_window", "num_window")) 
+
+data_cleaned$classe <- as.factor(data_cleaned$classe)
+
+validation_cleaned <- validation %>% 
+  select_if(~ !any(is.na(.))) %>% 
+  select(-ends_with("x"), -ends_with("y"), -ends_with("z"),
+         -c("V1", "user_name", "raw_timestamp_part_1", "raw_timestamp_part_2", "cvtd_timestamp"),
+         -c("new_window", "num_window"))
+
+```
+
+## Slicing Data for Cross Validation
+
+For the cross validation purposes I sliced the data into training and testing data set. The training data set contains 75% of the original data and the testing only 25%.
+
+```{r echo = TRUE}
+
+inTrain <- createDataPartition(y = data_cleaned$classe, p = 0.75, list = FALSE)
+
+training <- data_cleaned[inTrain, ]
+testing <- data_cleaned[-inTrain, ]
+
+```
+
+## Plotting Predictors
+
+Most of the predictors follow the same distribution pattern as shown in the graph below. Thus, no preprozessing is needed
+
+```{r echo = TRUE}
+
+hist(training$total_accel_arm, main = "", xlab = "Total Accel Arm")
+
+```
+
+## Fitting Model
+
+The goal is to build a high accurate model and for this reason I have chosen the method of "Random Forests".
+
+```{r echo = TRUE}
+
+modelFit <- train(classe ~ ., data = training, method = "rf")
+
+```
+
+## Predicting Results
+
+In the final step I check the performance of the model on the testing data set. As shown below the accuracy if very high, what let us conclude that the model has captured most relevant features for the training data set. 
+
+```{r echo = TRUE}
+
+predictions_rf <- predict(modelFit, testing)
+confusionMatrix(predictions_rf, testing$classe)
+
+```
+
